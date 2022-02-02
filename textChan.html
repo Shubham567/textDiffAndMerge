@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Diff Merge</title>
+    
+</head>
+<script>
+const debugMode = false;
+const debug = debugMode ? console.debug : () => {};
+
+function textDiff (oldText, newText) {
+
+  const sizeDiff = newText.length - oldText.length;
+
+  debug(sizeDiff);
+
+  let chars = null;
+  let startPos = -1;
+  let endPos = -1;
+  let mode = null;
+
+  if(sizeDiff > 0){
+    // Extra chars added
+    mode = "append";
+    debug("More Chars than Before");
+    for(let i = 0; i < newText.length; i++){
+      if(startPos === -1 && oldText[i] !== newText[i]){
+        // Start of Difference in string
+        debug("Setting diffStartPos ", i);
+        startPos = i;
+        i += sizeDiff - 1;
+        continue;
+      }
+      if(startPos !== -1 && newText[i] === oldText[i - sizeDiff] && endPos === -1){
+        // Checking diff after adding string difference position
+        debug("Setting diffEndPos ", i - 1);
+        endPos = i - 1;
+      }
+      else if(startPos !== -1 && newText[i] !== oldText[i - sizeDiff] ){
+        // Changes are not sequential mark till end of string as inserted rather than append
+        debug("Setting diffEndPos by fallback");
+        endPos = newText.length - 1;
+        mode = "insert";
+        break;
+      }
+    }
+    if(endPos === -1){
+      // Changes were at the end of the string, so now put diffEndPos could not have had a value. end with string len
+      debug("Setting diffEndPos ", newText.length -1);
+      endPos = newText.length - 1;
+    }
+    chars = newText.split("").splice(startPos,endPos - startPos + 1).join("");
+  }
+  else if(sizeDiff < 0) {
+    debug("Less Chars than before");
+
+    mode = "delete";
+    for(let i = 0; i < oldText.length; i++){
+      debug("Old text :", oldText[i], "New text[i] :", newText[i],"New text [i adj] :",newText[i - Math.abs(sizeDiff)], "Index :", i);
+      if(startPos === -1 && oldText[i] !== newText[i]){
+        // Start of Difference in string
+        debug("Setting diffStartPos ", i);
+        startPos = i;
+        i += Math.abs(sizeDiff) - 1;
+        continue;
+      }
+      if(startPos !== -1 && oldText[i] === newText[i - Math.abs(sizeDiff)] && endPos === -1){
+        // Checking diff after adding string difference position
+        debug("Setting diffEndPos ", i - 1);
+        endPos = i - 1;
+      }
+      else if(startPos !== -1 && oldText[i] !== newText[i - Math.abs(sizeDiff)] ){
+        // Changes are not sequential mark till end of string as inserted rather than append
+        debug("Setting diffEndPos by fallback");
+        endPos = oldText.length - 1;
+        mode = "insert";
+        break;
+      }
+    }
+    if(endPos === -1){
+      // Changes were at the end of the string, so now put diffEndPos could not have had a value. end with string len
+      debug("Setting diffEndPos ", oldText.length -1);
+      endPos = oldText.length - 1;
+    }
+    chars = mode === "insert" ? newText.split("").splice(startPos,newText.length - startPos + 1).join("") : "null";
+  }
+  else{
+    debug("Equal Chars as before");
+    for (let i = 0; i < oldText.length; i++) {
+      if(startPos === -1 && oldText[i] !== newText[i]){
+        // Start of difference in string
+        startPos = i;
+        endPos = i;
+        mode = "insert";
+      }
+      if (endPos !== -1 && oldText[i] !== newText[i]){
+        // Checking if more than one chars changed
+        endPos = i;
+      }
+    }
+    chars = newText.split("").splice(startPos,endPos - startPos + 1).join("");
+  }
+
+  if(startPos === -1){
+      // No Change in text
+        return {mode: "equal"};
+  }
+
+  let result = { startPos, mode};
+
+  switch (mode){
+    case "insert": result = {...result,endPos,chars}; break;
+    case "append": result = {...result, chars}; break;
+    case "delete": result = {...result,endPos}; break;
+    default: break;
+  }
+  return result;
+
+}
+
+function mergeDiff(presentState,diff){
+  let t = presentState.split("");
+  if(diff.mode === "append"){
+    let startPos = diff.startPos < presentState.length ? diff.startPos : presentState.length;
+    t.splice(startPos,0,diff.chars);
+  }
+  else if(diff.mode === "insert"){
+    let startPos = diff.startPos < presentState.length ? diff.startPos : presentState.length;
+    let delCount = diff.endPos < presentState.length ? diff.endPos - diff.startPos + 1 : presentState.length - diff.startPos;
+    t.splice(startPos,delCount,diff.chars);
+  }
+  else if(diff.mode === "delete" && diff.startPos < presentState.length){
+    let startPos = diff.startPos;
+    let delCount = diff.endPos < presentState.length ? diff.endPos - diff.startPos + 1 : presentState.length - diff.startPos;
+    t.splice(startPos,delCount);
+  }
+  else{
+    return presentState;
+  }
+  return t.join("");
+}
+
+</script>
+<style>
+    .container{
+        display: flex;
+        justify-content: space-between;
+    }
+    .textAreaItem{
+        width: 30%;
+        height: 95vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .buttonContainer{
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        justify-content: center;
+    }
+    textarea{
+        width: 100%;
+        height: 100%;
+        text-align: left;
+        
+    }
+    button{
+      margin: 5px;
+    }
+    h6{
+      text-align: center;
+      font-weight: 400;
+      font-size: medium;
+      font-family: 'Courier New', Courier, monospace;
+    }
+</style>
+<body>
+    <div class="container">
+        <div class="textAreaItem">
+            <textarea id="oldState">Hey Call Me</textarea>
+            <h6>
+              Old State
+            </h6>
+        </div>
+        <div class="textAreaItem">
+            <textarea id="newState">Hey Call Me SSS</textarea>
+            <h6>
+              New State
+            </h6>
+        </div>
+        <div class="buttonContainer">
+          <button id="merge">✅ Merge</button>
+          <button id="mergeAuto">>> Merge Auto</button>
+          <button id="normalize">⬅Normalize➡</button>
+        </div>
+        <div class="textAreaItem">
+            <textarea id="finalState">Hey Call Me</textarea>
+            <h6>
+              Final State
+            </h6>
+        </div>
+    </div>
+</body>
+<script>
+    let mergeBtn = document.getElementById("merge");
+    let oldTextArea = document.getElementById("oldState");
+    let newTextArea = document.getElementById("newState");
+    let finalState = document.getElementById("finalState");
+    let mergeAuto = document.getElementById("mergeAuto");
+    let normalize = document.getElementById("normalize");
+
+
+    function getDiffAndMerge(auto){
+
+        let oldText = oldTextArea.value;    
+        let newText = newTextArea.value;
+        let finalText = finalState.value;
+
+        let diff =  textDiff(oldText,newText);
+        console.log("Changed Val",diff);
+
+        let x = mergeDiff(finalText,diff);
+        finalState.value = x;
+        if(typeof auto === "boolean") 
+          oldTextArea.value = x;
+    }
+    function autoMerger(){
+      getDiffAndMerge(true);
+    }
+
+    mergeBtn.addEventListener("click",getDiffAndMerge);
+    normalize.addEventListener("click",() => {finalState.value = oldTextArea.value});
+    mergeAuto.addEventListener("click",autoMerger);
+
+</script>
+</html>
